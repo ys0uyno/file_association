@@ -24,9 +24,6 @@ void set_app_as_default_win81(const TCHAR *pszAppRegistryName, const TCHAR *pszS
 	{ 0x1C5C9D10, 0x1225, 0x4C97,{ 0x8C, 0x51, 0x98, 0xE1, 0xB6, 0xF0, 0xD4, 0xE0 } };
 	*/
 
-	DWORD dwret = 0;
-	bool flag = false;
-
 	IApplicationAssociationRegistration *paar1 = nullptr;
 	IApplicationAssociationRegistration *paar2 = nullptr;
 	IApplicationAssociationRegistration *paar3 = nullptr;
@@ -51,7 +48,7 @@ void set_app_as_default_win81(const TCHAR *pszAppRegistryName, const TCHAR *pszS
 			if (SUCCEEDED(hr))
 			{
 				printf("IID2_ApplicationAssociationRegistration + 0x10 succeeded\n");
-				flag = true;
+				return;
 			}
 		}
 		else
@@ -60,27 +57,24 @@ void set_app_as_default_win81(const TCHAR *pszAppRegistryName, const TCHAR *pszS
 				GetLastError());
 		}
 
-		if (!flag)
+		hr = paar1->QueryInterface(
+			IID3_ApplicationAssociationRegistration,
+			(void **)&paar3
+			);
+		if (SUCCEEDED(hr) && paar3)
 		{
-			hr = paar1->QueryInterface(
-				IID3_ApplicationAssociationRegistration,
-				(void **)&paar3
-				);
-			if (SUCCEEDED(hr) && paar3)
+			// HRESULT SetAppAsDefault(LPCWSTR, LPCWSTR, ASSOCIATIONTYPE);
+			hr = (*(int(__stdcall **)(PVOID, PVOID, PVOID, DWORD))(*(DWORD *)paar3 + 0x10))
+				(paar3, (PVOID)pszAppRegistryName, (PVOID)pszSet, atSetType);
+			if (SUCCEEDED(hr))
 			{
-				// HRESULT SetAppAsDefault(LPCWSTR, LPCWSTR, ASSOCIATIONTYPE);
-				hr = (*(int(__stdcall **)(PVOID, PVOID, PVOID, DWORD))(*(DWORD *)paar3 + 0x10))
-					(paar3, (PVOID)pszAppRegistryName, (PVOID)pszSet, atSetType);
-				if (SUCCEEDED(hr))
-				{
-					printf("IID3_ApplicationAssociationRegistration + 0x10 succeeded\n");
-				}
+				printf("IID3_ApplicationAssociationRegistration + 0x10 succeeded\n");
 			}
-			else
-			{
-				printf("QueryInterface IID3_ApplicationAssociationRegistration failed: %d\n",
-					GetLastError());
-			}
+		}
+		else
+		{
+			printf("QueryInterface IID3_ApplicationAssociationRegistration failed: %d\n",
+				GetLastError());
 		}
 	}
 	else
