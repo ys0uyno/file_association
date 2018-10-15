@@ -5,53 +5,54 @@
 #include <Windows.h>
 #include <ShlObj.h>
 
-void set_app_as_default(TCHAR *pszAppRegistryName, TCHAR *pszSet, ASSOCIATIONTYPE atSetType)
+void set_app_as_default_win81(const TCHAR *pszAppRegistryName, const TCHAR *pszSet, ASSOCIATIONTYPE atSetType)
 {
-	// for 32bit
 	const GUID CLSID_ApplicationAssociationRegistration =
-	{ 0x591209C7, 0x767B, 0x42B2,{ 0x9f, 0xba, 0x44, 0xee, 0x46, 0x15, 0xf2, 0xc7 } };
+	{ 0x591209C7, 0x767B, 0x42B2,{ 0x9F, 0xBA, 0x44, 0xEE, 0x46, 0x15, 0xF2, 0xC7 } };
 
-	const IID IID_ApplicationAssociationRegistration =
-	{ 0x4E530B0A, 0xE611, 0x4C77,{ 0xa3, 0xac, 0x90, 0x31, 0xd0, 0x22, 0x28, 0x1b } };
+	const IID IID1_ApplicationAssociationRegistration =
+	{ 0x4E530B0A, 0xE611, 0x4C77,{ 0xA3, 0xAC, 0x90, 0x31, 0xD0, 0x22, 0x28, 0x1B } };
 
 	const IID IID2_ApplicationAssociationRegistration =
-	{ 0x229D59E2, 0xF94A, 0x402E,{ 0x9a, 0x9f, 0x3b, 0x84, 0xa1, 0xac, 0xed, 0x77 } };
+	{ 0x229D59E2, 0xF94A, 0x402E,{ 0x9A, 0x9F, 0x3B, 0x84, 0xA1, 0xAC, 0xED, 0x77 } };
 
 	const IID IID3_ApplicationAssociationRegistration =
 	{ 0xC7225171, 0xB9A7, 0x4CF7,{ 0x86, 0x1F ,0x85, 0xAB, 0x7B, 0xA3, 0xC5, 0xB2 } };
 
-	auto hRet = 0;
-	auto ifA = false;
-	auto cInit = CoInitializeEx(NULL, NULL);
+	/* can try IID below if any problems occur
+	const IID IID3_ApplicationAssociationRegistration =
+	{ 0x1C5C9D10, 0x1225, 0x4C97,{ 0x8C, 0x51, 0x98, 0xE1, 0xB6, 0xF0, 0xD4, 0xE0 } };
+	*/
 
-	IApplicationAssociationRegistration *pAAR = nullptr;
-	IApplicationAssociationRegistration *pAAR2 = nullptr;
-	IApplicationAssociationRegistration *pAAR3 = nullptr;
-	IApplicationAssociationRegistration *pAAR4 = nullptr;
+	DWORD dwret = 0;
+	bool flag = false;
+
+	IApplicationAssociationRegistration *paar1 = nullptr;
+	IApplicationAssociationRegistration *paar2 = nullptr;
+	IApplicationAssociationRegistration *paar3 = nullptr;
 
 	HRESULT hr = CoCreateInstance(
 		CLSID_ApplicationAssociationRegistration,
 		NULL,
 		CLSCTX_INPROC_SERVER,
-		IID_ApplicationAssociationRegistration,
-		(void **)&pAAR
+		IID1_ApplicationAssociationRegistration,
+		(void **)&paar1
 		);
-	if (hr >= 0 && pAAR)
+	if (SUCCEEDED(hr) && paar1)
 	{
-		hr = pAAR->QueryInterface(
+		hr = paar1->QueryInterface(
 			IID2_ApplicationAssociationRegistration,
-			(void **)&pAAR2
+			(void **)&paar2
 			);
-		if (!FAILED(hr))
+		if (SUCCEEDED(hr) && paar2)
 		{
-			hr = (*(int(__stdcall **)(PVOID, PVOID, PVOID, DWORD))(*(DWORD *)pAAR2 + 0x10))
-				(pAAR2, pszAppRegistryName, pszSet, atSetType);
-			if (!FAILED(hr))
-				ifA = true;
-
-			if (pAAR2)
-				pAAR2->Release();
-			pAAR2 = 0;
+			hr = (*(int(__stdcall **)(PVOID, PVOID, PVOID, DWORD))(*(DWORD *)paar2 + 0x10))
+				(paar2, (PVOID)pszAppRegistryName, (PVOID)pszSet, atSetType);
+			if (SUCCEEDED(hr))
+			{
+				printf("IID2_ApplicationAssociationRegistration + 0x10 succeeded\n");
+				flag = true;
+			}
 		}
 		else
 		{
@@ -59,27 +60,21 @@ void set_app_as_default(TCHAR *pszAppRegistryName, TCHAR *pszSet, ASSOCIATIONTYP
 				GetLastError());
 		}
 
-		if (!ifA)
+		if (!flag)
 		{
-			hr = pAAR->QueryInterface(
+			hr = paar1->QueryInterface(
 				IID3_ApplicationAssociationRegistration,
-				(void **)&pAAR3
+				(void **)&paar3
 				);
-			if (!FAILED(hr))
+			if (SUCCEEDED(hr) && paar3)
 			{
-				// test fine in win8.1-32bit
-				// HRESULT SetAppAsDefault(LPCWSTR pszAppRegistryName, LPCWSTR pszSet, ASSOCIATIONTYPE atSetType);
-				hr = (*(int(__stdcall **)(PVOID, PVOID, PVOID, DWORD))(*(DWORD *)pAAR3 + 0x10))
-					(pAAR3, pszAppRegistryName, pszSet, atSetType);
-				if (!FAILED(hr))
-					ifA = true;
-
-				hr = (*(int(__stdcall **)(PVOID, DWORD, PVOID, PVOID))(*(DWORD *)pAAR + 0x14))
-					(pAAR, 1, pszAppRegistryName, &hRet);
-
-				if (pAAR3)
-					(*(void(__stdcall **)(PVOID))(*(DWORD *)pAAR3 + 0x08))(pAAR3);
-				pAAR3 = 0;
+				// HRESULT SetAppAsDefault(LPCWSTR, LPCWSTR, ASSOCIATIONTYPE);
+				hr = (*(int(__stdcall **)(PVOID, PVOID, PVOID, DWORD))(*(DWORD *)paar3 + 0x10))
+					(paar3, (PVOID)pszAppRegistryName, (PVOID)pszSet, atSetType);
+				if (SUCCEEDED(hr))
+				{
+					printf("IID3_ApplicationAssociationRegistration + 0x10 succeeded\n");
+				}
 			}
 			else
 			{
@@ -87,48 +82,22 @@ void set_app_as_default(TCHAR *pszAppRegistryName, TCHAR *pszSet, ASSOCIATIONTYP
 					GetLastError());
 			}
 		}
-
-		if (!ifA)
-		{
-			hr = pAAR->QueryInterface(IID3_ApplicationAssociationRegistration, (void **)&pAAR4);
-			if (!FAILED(hr))
-			{
-				hr = (*(int(__stdcall **)(PVOID, PVOID))(*(DWORD *)pAAR4 + 0x14))
-					(pAAR4, pszAppRegistryName);
-				if (!FAILED(hr))
-					ifA = true;
-
-				hr = (*(int(__stdcall **)(PVOID, DWORD, PVOID, PVOID))(*(DWORD *)pAAR + 0x14))
-					(pAAR, 1, pszAppRegistryName, &hRet);
-
-				if (pAAR4)
-					(*(void(__stdcall **)(PVOID))(*(DWORD *)pAAR4 + 0x08))(pAAR4);
-				pAAR4 = 0;
-			}
-			else
-			{
-				printf("QueryInterface IID3_ApplicationAssociationRegistration failed: %d\n",
-					GetLastError());
-			}
-		}
-
-		hr = (*(int(__stdcall **)(PVOID, DWORD, PVOID, PVOID))(*(DWORD *)pAAR + 0x14))
-			(pAAR, 1, pszAppRegistryName, &hRet);
-
-		if (pAAR)
-			pAAR->Release();
-		pAAR = 0;
 	}
 	else
 	{
-		printf("CoCreateInstance IID_ApplicationAssociationRegistration failed: %d\n",
+		printf("CoCreateInstance IID1_ApplicationAssociationRegistration failed: %d\n",
 			GetLastError());
 	}
+}
 
-	if (cInit >= 0)
-		CoUninitialize();
+void set_app_as_default(const TCHAR *pszAppRegistryName, const TCHAR *pszSet, ASSOCIATIONTYPE atSetType)
+{
+	CoInitializeEx(NULL, NULL);
 
-	return;
+	// test fine in win8.1-32/64bit, also in win10-64bit
+	set_app_as_default_win81(pszAppRegistryName, pszSet, atSetType);
+
+	CoUninitialize();
 }
 
 int _tmain(int argc, _TCHAR* argv[])
